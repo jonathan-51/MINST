@@ -7,15 +7,12 @@ train_images = idx2numpy.convert_from_file("train-images.idx3-ubyte")
 train_labels = idx2numpy.convert_from_file("train-labels.idx1-ubyte")
 #ensures that the output stays on one line in the terminal (only if it should)
 numpy.set_printoptions(linewidth=numpy.inf)
+#Suppresses scientific notion when printing out floating point numbers
 numpy.set_printoptions(suppress=True)
 
 #reshapes the 3D arraay into a 2D array by compressing the 28x28 matrix inside into a 1D 784 element array
 def reshape(train_images):
-    # new_train_images = numpy.array(train_images[0],dtype=float).reshape(1,784)
-    # for i in range(1,90):
-    #     new_train_images = numpy.append(new_train_images,train_images[i].reshape(1,784),axis=0)
-    # return new_train_images
-
+    #Compresses the 3D (60000,28,28) array into a 2D (60000,784) array
     new_train_images = train_images.reshape(-1,784)
     return numpy.array(new_train_images,dtype=float)
 
@@ -26,8 +23,11 @@ def normalize(new_train_images):
             new_train_images[i,j] = new_train_images[i,j]/255
     return new_train_images
 
+#Generates a binary array (1 = correct, 0 = incorrect) where the index of the array represents the digit
 def one_hot_encoding(train_labels, n):
+    #Generate a 1D array (,10) of zeros
     one_hot = numpy.zeros(10,dtype=int)
+    #assigns the correct index as 1
     one_hot[train_labels[n]] = 1 
     return one_hot
 
@@ -40,7 +40,7 @@ def ReLU(FHL):
 
 #Calculates the activation ouput for Hidden Layer
 def activation(train_images_normalized,weight_ki,bias_k,n):
-    #initilizes a 64 element 1D array
+    #initilizes a 64 element 1D array of zeros
     FHL = numpy.zeros(64)
     #Calculates the weighted sum of one pixel in digit and indexes it in FHL array.
     #After loop, will end up with a 64 element 1D array that represents the value of each neuron in the 1st hidden layer.
@@ -54,8 +54,10 @@ def activation(train_images_normalized,weight_ki,bias_k,n):
 
 #Calculates the raw output neurons in final layer
 def activation2(FHL,weight_jk,bias_j):
-    #initilizes a 64 element 1D array
+    #initilizes a 10 element 1D array
     output = numpy.zeros(10)
+    #Takes the weighted sum of weights and activation neurons in the hidden layer via matrix multiplication. Add bias via matrix addition.
+    #Output will be the output layers' neuron's raw values
     for i in range(10):
         #output[i] = weight_jk_current[i]@FHL_total[digit]
         output[i] = weight_jk[i]@FHL
@@ -64,37 +66,76 @@ def activation2(FHL,weight_jk,bias_j):
 
 #Softmax function
 def softmax(output_local):
-    #Calculates the values of e^(output value)
+    #Calculates the activation neuron's values for the output layer
     output_current = numpy.exp(output_local- numpy.max(output_local))
-    #Calculates the sum of these output values after taking the e^
+    #Calculates the sum of these activation neurons
     sum = numpy.sum(output_current)
 
-    #print(f"output_local = {output_local}")
-    #print(f"output_current = {output_current}")
-    #print(f"sum = {sum}")
-
-    #Calculates the probability
+    #Calculates the probability for each possible digit
     output = output_current/sum
 
-    #print(f"output_local{i} = {output_local}")
-
-    #returns an array where each row consists of the probability of the computer's decision for the digit.
+    #returns a 1D array that consists of the probability for each possible digit.
     return output
+
+#function that determines if the model made an incorrect prediction.
+def incorrect(probability,one_hot,e,n,category):
+    #Computes the index of the digit that the model is most confident is correct
+    i_f = numpy.where(probability == numpy.max(probability))
+    i_f = i_f[0]
+    i_f = i_f[0]
+    #computes the index of the true digit
+    i_t = numpy.where(one_hot == 1)
+    i_t = i_t[0]
+    i_t = i_t[0]
+    #if the model made an incorrect prediction
+    if one_hot[i_f] == 0 :
+        #Stores probability value of predicted digit
+        false_predicted_probability = round(probability[i_f]*100,2)
+        #Stores index of predicted digit
+        false_label = i_f
+        
+        #stores probability of correct digit
+        true_predicted_probability = round(probability[i_t]*100,2)
+        #stores index of correct digit
+        true_label = i_t
+
+        #Logs the statistics in a csv file
+        with open("incorrect.csv","a") as f:
+            f.write(f"\n{category},{e},{n},{true_label},{true_predicted_probability}%,{false_label},{false_predicted_probability}%")
+        return 
+    else:
+        return
 
 #Cross Entropy Loss function
 def loss_entropy(probability,train_labels,n):
     #initilize an array length of number of initial inputs.
     loss = numpy.zeros(len(probability))
 
+    #returns a 1D array where the index of the digit will be the only value that is > 0, all other values will be 0 due to the binary nature of the algorithm.
     loss[train_labels[n]] = -numpy.log(probability[train_labels[n]])
     return loss
 
+#Counts how many times the algorithm predicted correctly
+def accuracy_num(correct,correct_total,one_hot,probability):
+    #computes index of prediction
+    index = numpy.where(probability == numpy.max(probability))
+    #checks if the prediction is correct
+    if one_hot[index[0]] == 1 :
+        #Increase 1 for both batch and epoch
+        correct += 1
+        correct_total += 1
+        return correct, correct_total
+    else:
+        return correct, correct_total
+
+#Calculates the derivative for activation w.r.t raw value. Two equations generalized into 1
 def dReLU(FHL,k):
     if FHL[k] > 0:
         return 1
     else:
         return 0
-    
+
+#Calculates all derivatives for all weights and biases in the network for each input sample, and stores it in an array.
 def backprop(probability,weight_jk,train_images_normalized,FHL,n,one_hot):
     #initilizing an empty list that will hold all the derivatives of the loss value w.r.t the raw output value. 
     # Each column will compute out the derivative for that specific raw output value, for a total of 10 values per row.
@@ -154,6 +195,16 @@ def backprop(probability,weight_jk,train_images_normalized,FHL,n,one_hot):
     
     return dC_dwLjk, dC_dbLj, dC_dbL_1k, dC_dwL_1ki, dC_dzL
 
+#calculates the mean gradient for 1 batch
+def norm_gradients(dw_FL_batch, db_FL_batch, db_FL_1_batch, dw_FL_1_batch):
+    dbias_j_norm = round(numpy.sqrt(numpy.sum(db_FL_batch**2)),4)
+    dbias_k_norm = round(numpy.sqrt(numpy.sum(db_FL_1_batch**2)),4)
+    dweight_jk_norm = round(numpy.sqrt(numpy.sum(dw_FL_batch**2)),4)
+    dweight_ki_norm = round(numpy.sqrt(numpy.sum(dw_FL_1_batch**2)),4)
+
+    return dbias_j_norm,dbias_k_norm,dweight_jk_norm,dweight_ki_norm
+
+#Update parameters based on learning rate of 0.01 and gradients.
 def learning(bias_j,dbias_FL,bias_k,dbias_FL_1,weight_jk,dweight_FL,weight_ki,dweight_FL_1):
     lr = 0.01
     #Updates biases in output layer
@@ -167,76 +218,199 @@ def learning(bias_j,dbias_FL,bias_k,dbias_FL_1,weight_jk,dweight_FL,weight_ki,dw
 
     return bias_j_new, bias_k_new, weight_jk_new, weight_ki_new
 
+def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num):
+
+    count = 0
+    batch = 0
+    correct = 0
+    correct_total = 0
+    probability_avg_batch = 0
+    loss_avg_batch = 0
+    loss_avg_epoch = 0
+    gradient_mean = 0
+    dw_FL_batch = 0
+    dw_FL_1_batch = 0
+    db_FL_batch = 0
+    db_FL_1_batch = 0
+
+    #logs start time of 1 epoch
+    start_time = time.time()
+    
+    #Loops each iteration for a total of 60000 iterations
+    for n in range(len(train_dataset)):
+        print(f"train:{n}")
+        #logs start time for 1 batch
+        batch_start = time.time()
+        
+        #Generates a binary array (1 = correct, 0 = incorrect) where the index of the array represents the digit
+        one_hot = one_hot_encoding(train_labels,n)
+
+        #returns the activation value for the 64 neurons in the FHL
+        FHL = activation(train_dataset,weight_ki,bias_k,n)
+
+        #returns the raw output values for the 10 neurons in the output layer
+        output = activation2(FHL,weight_jk,bias_j)
+
+        #Applies the softmax value to the 10 raw neuron values in the final layer to transform it into a probability format
+        probability = softmax(output)
+
+        #determines if the model made an incorrect prediction.
+        #incorrect(probability,one_hot,e,n,category = "train")
+
+        # #Calculates the loss entropy for each 10 output neurons.
+        loss = loss_entropy(probability,train_labels,n)
+        # #Calulates the loss value for the entire network. 
+        loss_network = numpy.sum(loss)
+
+        #Counts how many times the algorithm predicted correctly
+        correct,correct_total = accuracy_num(correct,correct_total,one_hot,probability)
+
+        #Calculates all derivatives for all weights and biases in the network for each input sample, and stores it in an array.
+        dweight_FL, dbias_FL, dbias_FL_1, dweight_FL_1, dC_dzL = backprop(probability,weight_jk,train_dataset,FHL,n,one_hot)
+
+        #calculates the average magnitude of the gradient for the whole network
+        gradient_mean += numpy.sqrt((numpy.sum(dweight_FL**2)) + (numpy.sum(dbias_FL**2)) + (numpy.sum(dweight_FL_1**2)) + (numpy.sum(dbias_FL_1**2)))
+
+        #Update parameters based on learning rate of 0.01 and gradients.
+        bias_j, bias_k, weight_jk, weight_ki = learning(bias_j,dbias_FL,bias_k,dbias_FL_1,weight_jk,dweight_FL,weight_ki,dweight_FL_1) 
+
+        #Calculates sum of how confident the model is when predicting for the correct digit, for the current batch
+        probability_avg_batch +=  probability[train_labels[n]]
+        #Calculates the sum of the network's loss value, for current batch
+        loss_avg_batch +=  loss_network
+        #Calculates the sum of the network's loss value, for the whole epoch
+        loss_avg_epoch += loss_network
+
+        #calculates the sum of each batch's parameter's gradients.
+        dw_FL_batch += dweight_FL
+        dw_FL_1_batch += dweight_FL_1
+        db_FL_batch += dbias_FL
+        db_FL_1_batch += dbias_FL_1
+
+        #tracking number of iterations in order to log stats for each batch
+        count += 1
+        #Logging stats after each batch
+        if count % batch_num == 0:
+            #tracking number of batches
+            batch += 1
+            #reinitializes tracking number for number of iterations to determine subsequent batch
+            count = 0
+            
+            #Calculates the average probability for how confident the model is when predicting the correct digit, rounded to 2 d.p, in percetange
+            probability_avg_batch = round((probability_avg_batch/batch_num)*100,2)
+            #Calculates the average loss value for the batch, rounded to 4 d.p
+            loss_avg_batch = round(loss_avg_batch/batch_num,4)
+            #calculates how accurate the model is at in predicting the correct digit, in percentage, rounded to 2 d.p
+            accuracy_batch = round((correct/batch_num)*100,2)
+            
+            #Calculates the magnitude of each parameter's gradient for 1 batch
+            dbias_j_norm,dbias_k_norm,dweight_jk_norm,dweight_ki_norm = norm_gradients(dw_FL_batch, db_FL_batch, db_FL_1_batch, dw_FL_1_batch)
+
+            #logs the end time for one batch
+            batch_end = time.time()
+            
+            #recording a batch's statistics into a csv file
+            with open("training_report.csv","a") as f:
+                f.write(f"\n{e},{batch},0.01,{loss_avg_batch},{probability_avg_batch}%,{accuracy_batch}%,{round((batch_end - batch_start),3)}s,{dweight_ki_norm},{dbias_k_norm},{dweight_jk_norm},{dbias_j_norm}")
+            #Reintialize the variables to prep for next batch
+            probability_avg_batch = 0
+            correct = 0
+            loss_avg_batch = 0
+            dw_FL_batch, db_FL_batch, db_FL_1_batch, dw_FL_1_batch = 0,0,0,0
+    
+    #logging end time for 1 epoch
+    end_time = time.time()
+    
+    #Stores the most recent iteration's parameters into a npz file
+    numpy.savez("epoch_1_parameters.npz",wki = weight_ki, bk = bias_k, wjk = weight_jk, bj = bias_j)
+
+    #calculates the average loss for 1 epoch
+    loss_avg_epoch = round(loss_avg_epoch/(n+1),4)
+    #calculates the probability of a correct prediction
+    correct_total = round(correct_total/(n+1)*100,2)
+    #calculates the time taken to run 1 epoch
+    time_epoch = round(end_time - start_time)
+    #calculates the average mean gradient for one iteration over 1 epoch
+    gradient_mean = round(gradient_mean/(n+1),4)
+
+    return loss_avg_epoch, correct_total,time_epoch,gradient_mean,bias_j, bias_k, weight_jk, weight_ki
+
+def val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset):
+    
+    correct = 0
+    correct_total = 0
+    loss_avg_epoch = 0
+
+    #logs start time of 1 epoch
+    start_time = time.time()
+
+    for n in range(len(val_dataset)):
+        print(f"val:{n}")
+        one_hot = one_hot_encoding(train_labels,n)
+
+        #returns the activation value for the 64 neurons in the FHL for one digit
+        FHL = activation(val_dataset,weight_ki,bias_k,n)
+
+        #returns the raw output values for the 10 neurons in the output layer
+        output = activation2(FHL,weight_jk,bias_j)
+
+        #Applies the softmax value to the 10 raw neuron values in the final layer to transform it into a probability format
+        probability = softmax(output)
+
+        #determines if the model made an incorrect prediction.
+        #incorrect(probability,one_hot,e,n,category = "validation")
+
+        # #Calculates the loss entropy for each 10 output neurons. Ultimately,
+        loss = loss_entropy(probability,train_labels,n)
+
+        # #Calulates the loss value for the entire network
+        loss_network = numpy.sum(loss)
+        #Calculates the sum of the network's loss value, for the whole epoch
+        loss_avg_epoch += loss_network
+
+        #Counts how many times the algorithm predicted correctly
+        correct,correct_total = accuracy_num(correct,correct_total,one_hot,probability)
+
+    #logging end time for 1 epoch
+    end_time = time.time()
+
+    #calculates the average loss for 1 epoch
+    val_loss = round(loss_avg_epoch/(n+1),4)
+    #calculates the probability of a correct prediction
+    val_acc = round(correct_total/(n+1)*100,2)
+    #calculates the time taken to run 1 epoch
+    val_time = round(end_time - start_time)
+
+    return val_loss, val_acc, val_time
+
+
 #reshapes the 3D arraay into a 2D array by compressing the 28x28 matrix inside into a 1D 784 element array
 new_train_images = reshape(train_images)
 
 #encodes all the greyscale values (0-255) into a range between 0-1
 train_images_normalized = normalize(new_train_images)
 
-#initilizes a 10x64 array
-weight_jk = numpy.random.normal(loc=0,scale=numpy.sqrt((2/784)),size=(10,64))
-#initlizaes a 10 element 1D array
-bias_j = numpy.zeros((10))
-#initilizes a 64x784 array
-weight_ki = numpy.random.normal(loc=0,scale=numpy.sqrt((2/784)),size=(64,784))
-#initlizaes a 64 element 1D array
-bias_k = numpy.zeros((64))
+#Splits the training data into training and validation data. Just number of rows has changed, each row still contains 784 elements
+train_dataset = train_images_normalized[:50,:]
+val_dataset = train_images_normalized[50:60,:]
+#Sets number of iterations per batch
+batch_num = 10
+#epoch number
+e = 1
 
+#Loads the stored parameters
+data = numpy.load("initial_parameters1.npz")
+weight_ki = data["wki"]
+bias_k = data["bk"]
+weight_jk = data["wjk"]
+bias_j = data["bj"]
 
-# data = numpy.load("epoch_1_parameters")
-# weight_ki = data["wki"]
-# bias_k = data["bk"]
-# weight_jk = data["wjk"]
-# bias_j = data["bj"]
+#Function to run 1 epoch for training
+train_loss,train_acc,train_time,gradient_mean,bias_j, bias_k, weight_jk, weight_ki = train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num)
 
-count = 0
-batch = 0
-probability_avg = 0
-start_time = time.time()
-for n in range(60000):
+#Function to run 1 epoch for validation
+val_loss, val_acc, val_time = val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset)
 
-    one_hot = one_hot_encoding(train_labels,n)
-
-    #returns the activation value for the 64 neurons in the FHL for one digit
-    FHL = activation(train_images_normalized,weight_ki,bias_k,n)
-
-    #returns the raw output values for the 10 neurons in the output layer
-    output = activation2(FHL,weight_jk,bias_j)
-
-    #Applies the softmax value to the 10 raw neuron values in the final layer to transform it into a probability format
-    #print(f"output{n}: {output}")
-    probability = softmax(output)
-    print(f"probability{n}: {probability}, {train_labels[n]}")
-    # #Calculates the loss entropy for each 10 output neurons. Ultimately,
-    loss = loss_entropy(probability,train_labels,n)
-
-    # #Calulates the loss value for the entire network
-    loss_network = numpy.sum(loss)
-
-    #Calculates all derivatives for all weights and biases in the network for each input sample, and stores it in an array.
-    dweight_FL, dbias_FL, dbias_FL_1, dweight_FL_1, dC_dzL = backprop(probability,weight_jk,train_images_normalized,FHL,n,one_hot)
-    # print(f"gradient{n}: {dweight_FL[0]}")
-    # print(f"weight{n}: {weight_jk[0]}")
-    # print(f"gradient{n}: {dbias_FL} {train_labels[n]}")
-    # print(f"bias{n}: {bias_j}")
-    # print(f"gradient{n}: {dC_dzL} {train_labels[n]}")
-    # print(f"bias{n}: {output}")    
-    #Update parameters based on learning rate of 0.01 and gradients.
-    bias_j, bias_k, weight_jk, weight_ki = learning(bias_j,dbias_FL,bias_k,dbias_FL_1,weight_jk,dweight_FL,weight_ki,dweight_FL_1) 
-
-    probability_avg = probability_avg + probability[train_labels[n]]
-
-    count += 1
-    if count % 300 == 0:
-        batch += 1
-        count = 0
-        probability_avg = (probability_avg/300)*100
-        with open("training_report.csv","a") as f:
-            f.write(f"\n1,{batch},{loss_network},0.01,{probability_avg}%")
-        probability_avg = 0
-
-
-numpy.savez("epoch_1_parameters.npz",wki = weight_ki, bk = bias_k, wjk = weight_jk, bj = bias_j)
-end_time = time.time()
-print(end_time - start_time)
-
+#Record statistics onto a csv file after each epoch
+with open("epoch_summary.csv","a") as f:
+    f.write(f"\n{e},{train_loss},{val_loss},{train_acc}%,{val_acc}%,{train_time}s,{val_time}s,0.01,{gradient_mean}")
