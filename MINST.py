@@ -230,6 +230,117 @@ def batch_log_calc(probability_avg_batch,batch_num,loss_avg_batch,correct):
 
     return  probability_avg_batch,loss_avg_batch, accuracy_batch
 
+#Determines if the model predicted correctly for the one sample
+def incorrect_correct(probability_total,one_hot_total,n):
+    #Finds the index of what the model predicted
+    i_p = numpy.where(probability_total[n] == numpy.max(probability_total[n]))
+    if one_hot_total[n,i_p] == 1:
+        return True
+    else:
+        return False
+
+#Returns the cumulative total for the model's correct predictions from one training epoch every 10000 samples
+def class_accuracy(class_total,probability_total,one_hot_total,n):
+    if n == 9999:
+        #from index 0 to 9999 (10000 samples)
+        for i in range(10000):
+            #Determines if model made a correct prediction
+            if incorrect_correct(probability_total,one_hot_total,i) == True:
+                #computing index of correct prediction; essentially represents the class it predicted right
+                index = numpy.where(probability_total[i] == numpy.max(probability_total[i]))
+                #Increase that index by 1
+                class_total[index] += 1
+    elif n == 19999:
+        #from index 10000 to 19999 (10000 samples)
+        for i in range(10000,20000):
+            #Determines if model made a correct prediction
+            if incorrect_correct(probability_total,one_hot_total,i) == True:
+                #computing index of correct prediction; essentially represents the class it predicted right
+                index = numpy.where(probability_total[i] == numpy.max(probability_total[i]))
+                #Increase that index by 1
+                class_total[index] += 1
+    elif n == 29999:
+        #from index 20000 to 29999 (10000 samples)
+        for i in range(20000,30000):
+            #Determines if model made a correct prediction
+            if incorrect_correct(probability_total,one_hot_total,i) == True:
+                #computing index of correct prediction; essentially represents the class it predicted right
+                index = numpy.where(probability_total[i] == numpy.max(probability_total[i]))
+                #Increase that index by 1
+                class_total[index] += 1
+    elif n == 39999:
+        #from index 30000 to 39999 (10000 samples)
+        for i in range(30000,40000):
+            #Determines if model made a correct prediction
+            if incorrect_correct(probability_total,one_hot_total,i) == True:
+                #computing index of correct prediction; essentially represents the class it predicted right
+                index = numpy.where(probability_total[i] == numpy.max(probability_total[i]))
+                #Increase that index by 1
+                class_total[index] += 1
+    elif n == 49999:
+        #from index 40000 to 49999 (10000 samples)
+        for i in range(40000,50000):
+            #Determines if model made a correct prediction
+            if incorrect_correct(probability_total,one_hot_total,i) == True:
+                #computing index of correct prediction; essentially represents the class it predicted right
+                index = numpy.where(probability_total[i] == numpy.max(probability_total[i]))
+                #Increase that index by 1
+                class_total[index] += 1
+    return class_total
+
+#Returns the total cumulative of each class in one training epoch every 10000 samples.
+def labels_accuracy(labels_total,train_labels,n):
+    if n == 9999:
+        #from index 0 to 9999 (10000 samples)
+        for i in range(10000):
+            #Increase the index of class by 1
+            labels_total[train_labels[i]] += 1
+
+    if n == 19999:
+        #from index 10000 to 19999 (10000 samples)
+        for i in range(10000,20000):
+            #Increase the index of class by 1
+            labels_total[train_labels[i]] += 1
+
+    if n == 29999:
+        #from index 20000 to 29999 (10000 samples)
+        for i in range(20000,30000):
+            #Increase the index of class by 1
+            labels_total[train_labels[i]] += 1
+
+    if n == 39999:
+        #from index 30000 to 39999 (10000 samples)
+        for i in range(30000,40000):
+            #Increase the index of class by 1
+            labels_total[train_labels[i]] += 1
+
+    if n == 49999:
+        #from index 40000 to 49999 (10000 samples)
+        for i in range(40000,50000):
+            #Increase the index of class by 1
+            labels_total[train_labels[i]] += 1
+
+    return labels_total
+
+#returns the total correct predictions by model for 1 validation epoch
+def val_class_accuracy(class_total,probability_total,one_hot_total,n):
+    for i in range(n+1):
+        #Determines if the model predicted correctly for one sample
+        if incorrect_correct(probability_total,one_hot_total,i) == True:
+            #Computing index of correctly predicted class
+            index = numpy.where(probability_total[i] == numpy.max(probability_total[i]))
+            #Add one to the predicted class
+            class_total[index] += 1
+    return class_total
+
+#Returns the total number of each class for one validation epoch
+def val_labels_accuracy(labels_total,val_labels,n):
+    for i in range(n+1):
+        #Adds one to the index of class
+        labels_total[val_labels[i]] += 1
+    return labels_total
+    
+
 #calculates the time and the mean loss, accuracy, and gradient for an epoch. Gradient is normalized gradient of each iteration averaged out over an epoch
 def epoch_log_calc(n,loss_avg_epoch,correct_total,end_time,start_time,gradient_mean):
     #calculates the average loss for 1 epoch
@@ -242,61 +353,27 @@ def epoch_log_calc(n,loss_avg_epoch,correct_total,end_time,start_time,gradient_m
     gradient_mean = round(gradient_mean/(n+1),4)
     return loss_avg_epoch,correct_total,time_epoch,gradient_mean
 
-#determines if what the model predicted is correct or not
-def correct_incorrect(probability_total,one_hot_total,n):
-    #Finds the index of predicted digit
-    i_predicted = numpy.where(probability_total[n] == numpy.max(probability_total[n]))
-    #finds the index of true digit
-    i_label = numpy.where(one_hot_total[n] == 1)
-    #If model predicted correctly, will return TRUE, or else it will return FALSE
-    if i_predicted == i_label:
-        return True
-    else:
-        return False
-
-#Generates an array of all the models correct predictions.
-def class_accuracy(probability_total,one_hot_total,dataset_size):
-    #initializing a 1D array with 10 elements
-    class_acc_array = numpy.zeros(10)
-    #Loops entire dataset
-    for n in range(len(dataset_size)):
-        #Determines if prediction at index 'n' is correct or not
-        if correct_incorrect(probability_total,one_hot_total,n) == True:
-            #Assigns index of correct prediction to a variable
-            i_label = numpy.where(one_hot_total[n] == 1)
-            #Increase count on the index of predicted digit
-            class_acc_array[i_label] += 1
-    return class_acc_array
-
-#Generates an array of the datasets correct digits
-def label_class_acc(labels):
-    #initialize a 1D array with 10 elements
-    labels_class = numpy.zeros(10)
-    #loops entre label dataset
-    for n in range(len(labels)):
-        #Increases the position of the array according to the nth index of label dataset by 1
-        labels_class[labels[n]] += 1
-    return labels_class
 
 def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,val_dataset,train_labels,val_labels,lr):
 
-    count,batch,correct,correct_total,probability_avg_batch,loss_avg_batch,loss_avg_epoch,gradient_mean,dw_FL_batch,dw_FL_1_batch,db_FL_batch,db_FL_1_batch = 0,0,0,0,0,0,0,0,0,0,0,0
-    val_e = 0
-    train_probability_total = numpy.zeros((len(train_dataset),10))
-    one_hot_total = numpy.zeros((len(train_dataset),10))
+    val_e, count,batch,correct,correct_total,probability_avg_batch,loss_avg_batch,loss_avg_epoch,gradient_mean,dw_FL_batch,dw_FL_1_batch,db_FL_batch,db_FL_1_batch = 0,0,0,0,0,0,0,0,0,0,0,0,0
 
+    probability_total = numpy.zeros((len(train_dataset),10))
+    one_hot_total = numpy.zeros((len(train_dataset),10))
+    class_total = numpy.zeros(10)
+    labels_total = numpy.zeros(10)
     #logs start time of 1 epoch
     start_time = time.time()
     
     #Loops each iteration for a total of 60000 iterations
     for n in range(len(train_dataset)):
-
-        #logs start time for 1 batch
-        batch_start = time.time()
+        if count == 0:
+            #logs start time for 1 batch
+            batch_start = time.time()
         
         #Generates a binary array (1 = correct, 0 = incorrect) where the index of the array represents the digit
         one_hot = one_hot_encoding(train_labels,n)
-        #Storing nth one hot encoding to array
+        #stores 'nth' one hot in an array
         one_hot_total[n] = one_hot
 
         #returns the activation value for the 64 neurons in the FHL
@@ -307,9 +384,9 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
 
         #Applies the softmax value to the 10 raw neuron values in the final layer to transform it into a probability format
         probability = softmax(output)
-        #Storing nth predicted probabilities to array
-        train_probability_total[n] = probability
-        
+        #stores 'nth' probability in an array
+        probability_total[n] = probability
+
         #determines if the model made an incorrect prediction.
         #incorrect(probability,one_hot,e,n,category = "train")
 
@@ -362,41 +439,66 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
             batch_end = time.time()
             
             #recording a batch's statistics into a csv file
-            with open("training_report.csv","a") as f:
+            with open("Test_1_LR0-01/training_report_T1.csv","a") as f:
                 f.write(f"\n{e},{batch},{lr},{loss_avg_batch},{probability_avg_batch}%,{accuracy_batch}%,{round((batch_end - batch_start),3)}s,{dweight_ki_norm},{dbias_k_norm},{dweight_jk_norm},{dbias_j_norm}")
             
             #Reintialize the variables to prep for next batch
             probability_avg_batch,correct,loss_avg_batch,dw_FL_batch, db_FL_batch, db_FL_1_batch, dw_FL_1_batch = 0,0,0,0,0,0,0
 
-        if n == 99 or n == 199 or n == 299 or n == 399:
+        if n == 9999 or n == 19999 or n == 29999 or n == 39999:
             print (f"n = {n}")
             print(f"val_e = {val_e}")
             val_e += 1
 
+            #Gets the total cumulative correct predictions by model every 10000 training samples.
+            class_total = class_accuracy(class_total,probability_total,one_hot_total,n)
+            print(f"Train_class: {class_total}")
+            #Gets the total cumulative true labels in the training dataset, every 10000 samples
+            labels_total = labels_accuracy(labels_total,train_labels,n)
+            print(f"Train_labels: {labels_total}")
+            #Calculates the percentage of models correct predictions for each class, arranged in a 1D array with 10 elements,
+            tcacc = numpy.round((class_total/labels_total)*100,2)
+
             #Function to run 1 epoch for validation
-            val_loss, val_acc, val_time, val_probability_total, val_one_hot_total = val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels)
+            val_loss, val_acc, val_time,val_class_total, val_labels_total = val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels)
+
+            #Calculates the percentage of models correct predictions for each class, arranged in a 1D array with 10 elements. From one validation epoch
+            vcacc = numpy.round((val_class_total/val_labels_total)*100,2)
+
             time_val = time.time()
-            with open("epoch_summary.csv","a") as f:
-                f.write(f"\n{(e-1)+(val_e/5)},{round(loss_avg_epoch/(n+1),4)},{val_loss},{round(correct_total/(n+1)*100,2)}%,{val_acc}%,{round(time_val - start_time)}s,{val_time}s,{lr},{round(gradient_mean/(n+1),4)}")
+            with open("Test_1_LR0-01/epoch_summary_T1.csv","a") as f:
+                f.write(f"\n{(e-1)+(val_e/5)},{round(loss_avg_epoch/(n+1),4)},{val_loss},{round(correct_total/(n+1)*100,2)}%,{val_acc}%,{round(time_val - start_time)}s,{val_time}s,{lr},{round(gradient_mean/(n+1),4)},{tcacc[0]},{tcacc[1]},{tcacc[2]},{tcacc[3]},{tcacc[4]},{tcacc[5]},{tcacc[6]},{tcacc[7]},{tcacc[8]},{tcacc[9]},{vcacc[0]},{vcacc[1]},{vcacc[2]},{vcacc[3]},{vcacc[4]},{vcacc[5]},{vcacc[6]},{vcacc[7]},{vcacc[8]},{vcacc[9]}")
+
+
+    #Gets the total cumulative correct predictions by model every 10000 training samples.
+    class_total = class_accuracy(class_total,probability_total,one_hot_total,n)
+    print(f"Train_class: {class_total}")
+    #Gets the total cumulative true labels in the training dataset, every 10000 samples
+    labels_total = labels_accuracy(labels_total,train_labels,n)
+    print(f"Train_labels: {labels_total}")
+    #Calculates the percentage of models correct predictions for each class, arranged in a 1D array with 10 elements,
+    tcacc = numpy.round((class_total/labels_total)*100,2)
 
     #logging end time for 1 epoch
     end_time = time.time()
-    
+
     #Stores the most recent iteration's parameters into a npz file
-    # numpy.savez(f"epoch_{e}_parameters.npz",wki = weight_ki, bk = bias_k, wjk = weight_jk, bj = bias_j)
+    numpy.savez(f"Test_1_LR0-01/epoch_{e}_parameters_T1.npz",wki = weight_ki, bk = bias_k, wjk = weight_jk, bj = bias_j)
 
     #calculates the statistics for 1 epoch
     loss_avg_epoch,correct_total,time_epoch,gradient_mean = epoch_log_calc(n,loss_avg_epoch,correct_total,end_time,start_time,gradient_mean)
 
-    return loss_avg_epoch, correct_total,time_epoch,gradient_mean,bias_j, bias_k, weight_jk, weight_ki,train_probability_total,one_hot_total
+    return loss_avg_epoch, correct_total,time_epoch,gradient_mean,bias_j, bias_k, weight_jk, weight_ki,class_total,labels_total,tcacc
 
 def val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels):
     
     correct = 0
     correct_total = 0
     loss_avg_epoch = 0
-    val_probability_total = numpy.zeros((len(val_dataset),10))
+    probability_total = numpy.zeros((len(val_dataset),10))
     one_hot_total = numpy.zeros((len(val_dataset),10))
+    class_total = numpy.zeros(10)
+    labels_total = numpy.zeros(10)
 
     #logs start time of 1 epoch
     start_time = time.time()
@@ -404,7 +506,7 @@ def val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels):
     for n in range(len(val_dataset)):
         #print(f"val:{n}")
         one_hot = one_hot_encoding(val_labels,n)
-        #Storing nth one hot encoding to array
+        #stores 'nth' one hot in an array
         one_hot_total[n] = one_hot
 
         #returns the activation value for the 64 neurons in the FHL for one digit
@@ -415,8 +517,8 @@ def val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels):
 
         #Applies the softmax value to the 10 raw neuron values in the final layer to transform it into a probability format
         probability = softmax(output)
-        #Storing nth predicted probabilities to array
-        val_probability_total[n] = probability
+        #stores 'nth' probability in an array
+        probability_total[n] = probability
         
         #determines if the model made an incorrect prediction.
         #incorrect(probability,one_hot,e,n,category = "validation")
@@ -442,7 +544,13 @@ def val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels):
     #calculates the time taken to run 1 epoch
     val_time = round(end_time - start_time)
 
-    return val_loss, val_acc, val_time, val_probability_total, one_hot_total
+    #Gets total correct predictions for each class in a 1D array with 10 elements
+    val_class_total = val_class_accuracy(class_total,probability_total,one_hot_total,n)
+    print(f"Val_class: {val_class_total}")
+    #Gets total number of each class, stored in a 1D array with 10 elements
+    val_labels_total = val_labels_accuracy(labels_total,val_labels,n)
+    print(f"Val_labels: {val_labels_total}")
+    return val_loss, val_acc, val_time, val_class_total, val_labels_total
 
 #reshapes the 3D arraay into a 2D array by compressing the 28x28 matrix inside into a 1D 784 element array
 new_train_images = reshape(train_images)
@@ -451,13 +559,13 @@ new_train_images = reshape(train_images)
 train_images_normalized = normalize(new_train_images)
 
 #Splits the training data into training and validation data. Just number of rows has changed, each row still contains 784 elements
-train_dataset = train_images_normalized[:500,:]
-val_dataset = train_images_normalized[500:600,:]
-train_labels = train_labels_total[:500]
-val_labels = train_labels_total[500:600]
+train_dataset = train_images_normalized[:50000,:]
+val_dataset = train_images_normalized[50000:60000,:]
+train_labels = train_labels_total[:50000]
+val_labels = train_labels_total[50000:60000]
 
 #Sets number of iterations per batch
-batch_num = 25
+batch_num = 250
 #epoch number
 e = 10
 #Learning Rate
@@ -465,31 +573,23 @@ lr = 0.01
 
 #Loads the stored parameters
 #data = numpy.load(f"epoch_{e-1}_parameters.npz")
-data = numpy.load(f"initial_parameters5.npz")
+data = numpy.load(f"Test_1_LR0-01/epoch_9_parameters_T1.npz")
 weight_ki = data["wki"]
 bias_k = data["bk"]
 weight_jk = data["wjk"]
 bias_j = data["bj"]
 
 #Function to run 1 epoch for training
-train_loss,train_acc,train_time,gradient_mean,bias_j, bias_k, weight_jk, weight_ki, train_probability_total, train_one_hot_total = train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,val_dataset,train_labels,val_labels,lr)
+train_loss,train_acc,train_time,gradient_mean,bias_j, bias_k, weight_jk, weight_ki, class_total, labels_total, tcacc = train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,val_dataset,train_labels,val_labels,lr)
+
 
 #Function to run 1 epoch for validation
-val_loss, val_acc, val_time, val_probability_total, val_one_hot_total = val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels)
+val_loss, val_acc, val_time, val_class_total, val_labels_total = val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels)
 
-#Computing an array of models correct predictions for each class, for both training and validation datasets
-tcacc = class_accuracy(train_probability_total, train_one_hot_total,train_dataset)
-vcacc = class_accuracy(val_probability_total, val_one_hot_total,val_dataset)
-#Computing an array of number of classes for each dataset, training and validation
-train_labels_class = label_class_acc(train_labels)
-val_labels_class = label_class_acc(val_labels)
-
-#Turning into a percentage, 2 d.p
-tcacc = numpy.round((tcacc/train_labels_class)*100,2)
-vcacc = numpy.round((vcacc/val_labels_class)*100,2)
-
+#Calculates the percentage of models correct predictions for each class, arranged in a 1D array with 10 elements. From one validation epoch
+vcacc = numpy.round((val_class_total/val_labels_total)*100,2)
 
 #Record statistics onto a csv file after each epoch
-with open("epoch_summary.csv","a") as f:
-    f.write(f"\n{e},{train_loss},{val_loss},{train_acc}%,{val_acc}%,{train_time}s,{val_time}s,{lr},{gradient_mean},{vcacc[0]},{vcacc[1]},{vcacc[2]},{vcacc[3]},{vcacc[4]},{vcacc[5]},{vcacc[6]},{vcacc[7]},{vcacc[8]},{vcacc[9]},{tcacc[0]},{tcacc[1]},{tcacc[2]},{tcacc[3]},{tcacc[4]},{tcacc[5]},{tcacc[6]},{tcacc[7]},{tcacc[8]},{tcacc[9]}")
+with open("Test_1_LR0-01/epoch_summary_T1.csv","a") as f:
+    f.write(f"\n{e},{train_loss},{val_loss},{train_acc}%,{val_acc}%,{train_time}s,{val_time}s,{lr},{gradient_mean},{tcacc[0]},{tcacc[1]},{tcacc[2]},{tcacc[3]},{tcacc[4]},{tcacc[5]},{tcacc[6]},{tcacc[7]},{tcacc[8]},{tcacc[9]},{vcacc[0]},{vcacc[1]},{vcacc[2]},{vcacc[3]},{vcacc[4]},{vcacc[5]},{vcacc[6]},{vcacc[7]},{vcacc[8]},{vcacc[9]}")
 
