@@ -241,45 +241,45 @@ def incorrect_correct(probability_total,one_hot_total,n):
 
 #Returns the cumulative total for the model's correct predictions from one training epoch every 10000 samples
 def class_accuracy(class_total,probability_total,one_hot_total,n):
-    if n == 999:
+    if n == 9999:
         #from index 0 to 9999 (10000 samples)
-        for i in range(1000):
+        for i in range(10000):
             #Determines if model made a correct prediction
             if incorrect_correct(probability_total,one_hot_total,i) == True:
                 #computing index of correct prediction; essentially represents the class it predicted right
                 index = numpy.where(probability_total[i] == numpy.max(probability_total[i]))
                 #Increase that index by 1
                 class_total[index] += 1
-    elif n == 1999:
+    elif n == 19999:
         #from index 10000 to 19999 (10000 samples)
-        for i in range(1000,2000):
+        for i in range(10000,20000):
             #Determines if model made a correct prediction
             if incorrect_correct(probability_total,one_hot_total,i) == True:
                 #computing index of correct prediction; essentially represents the class it predicted right
                 index = numpy.where(probability_total[i] == numpy.max(probability_total[i]))
                 #Increase that index by 1
                 class_total[index] += 1
-    elif n == 2999:
+    elif n == 29999:
         #from index 20000 to 29999 (10000 samples)
-        for i in range(2000,3000):
+        for i in range(20000,30000):
             #Determines if model made a correct prediction
             if incorrect_correct(probability_total,one_hot_total,i) == True:
                 #computing index of correct prediction; essentially represents the class it predicted right
                 index = numpy.where(probability_total[i] == numpy.max(probability_total[i]))
                 #Increase that index by 1
                 class_total[index] += 1
-    elif n == 3999:
+    elif n == 39999:
         #from index 30000 to 39999 (10000 samples)
-        for i in range(3000,4000):
+        for i in range(30000,40000):
             #Determines if model made a correct prediction
             if incorrect_correct(probability_total,one_hot_total,i) == True:
                 #computing index of correct prediction; essentially represents the class it predicted right
                 index = numpy.where(probability_total[i] == numpy.max(probability_total[i]))
                 #Increase that index by 1
                 class_total[index] += 1
-    elif n == 4999:
+    elif n == 49999:
         #from index 40000 to 49999 (10000 samples)
-        for i in range(4000,5000):
+        for i in range(40000,50000):
             #Determines if model made a correct prediction
             if incorrect_correct(probability_total,one_hot_total,i) == True:
                 #computing index of correct prediction; essentially represents the class it predicted right
@@ -290,33 +290,33 @@ def class_accuracy(class_total,probability_total,one_hot_total,n):
 
 #Returns the total cumulative of each class in one training epoch every 10000 samples.
 def labels_accuracy(labels_total,train_labels,n):
-    if n == 999:
+    if n == 9999:
         #from index 0 to 9999 (10000 samples)
-        for i in range(1000):
+        for i in range(10000):
             #Increase the index of class by 1
             labels_total[train_labels[i]] += 1
 
-    if n == 1999:
+    if n == 19999:
         #from index 10000 to 19999 (10000 samples)
-        for i in range(1000,2000):
+        for i in range(10000,20000):
             #Increase the index of class by 1
             labels_total[train_labels[i]] += 1
 
-    if n == 2999:
+    if n == 29999:
         #from index 20000 to 29999 (10000 samples)
-        for i in range(2000,3000):
+        for i in range(20000,30000):
             #Increase the index of class by 1
             labels_total[train_labels[i]] += 1
 
-    if n == 3999:
+    if n == 39999:
         #from index 30000 to 39999 (10000 samples)
-        for i in range(3000,4000):
+        for i in range(30000,40000):
             #Increase the index of class by 1
             labels_total[train_labels[i]] += 1
 
-    if n == 4999:
+    if n == 49999:
         #from index 40000 to 49999 (10000 samples)
-        for i in range(4000,5000):
+        for i in range(40000,50000):
             #Increase the index of class by 1
             labels_total[train_labels[i]] += 1
 
@@ -352,6 +352,15 @@ def epoch_log_calc(n,loss_avg_epoch,correct_total,end_time,start_time,gradient_m
     gradient_mean = round(gradient_mean/(n+1),4)
     return loss_avg_epoch,correct_total,time_epoch,gradient_mean
 
+#Updates confusion matrix per sample
+def confusion_matrix(matrix,one_hot,probability):
+    #Get index of predicted probability
+    i_p = numpy.where(probability == numpy.max(probability))
+    #Get index of True class
+    i_t = numpy.where(one_hot == 1)
+    #Increase the index of matrix by 1. Row represents true indices while column represents predicted indices
+    matrix[i_t,i_p] += 1
+    return matrix
 
 def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,val_dataset,train_labels,val_labels,lr):
 
@@ -361,6 +370,8 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
     one_hot_total = numpy.zeros((len(train_dataset),10))
     class_total = numpy.zeros(10)
     labels_total = numpy.zeros(10)
+    #Initialize Confusion Matrix for the training dataset. Rows = True, Columns = Predicted
+    confusion_matrix_train = numpy.zeros((10,10))
     #logs start time of 1 epoch
     start_time = time.time()
     
@@ -421,6 +432,9 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
         db_FL_batch += dbias_FL
         db_FL_1_batch += dbias_FL_1
 
+        #Updates matrix for per iteration.
+        confusion_matrix_train = confusion_matrix(confusion_matrix_train,one_hot,probability)
+
         #tracking number of iterations in order to log stats for each batch
         count += 1
         #Logging stats after each batch
@@ -446,7 +460,7 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
             #Reintialize the variables to prep for next batch
             probability_avg_batch,correct,loss_avg_batch,dw_FL_batch, db_FL_batch, db_FL_1_batch, dw_FL_1_batch = 0,0,0,0,0,0,0
 
-        if n == 999 or n == 1999 or n == 2999 or n == 3999:
+        if n == 9999 or n == 19999 or n == 29999 or n == 39999:
             #print (f"n = {n}")
             val_e += 1
 
@@ -463,7 +477,7 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
             train_max_probability_cumulative = round((max_probability_epoch/(n+1))*100,2)
 
             #Function to run 1 epoch for validation
-            val_loss, val_acc, val_time,val_class_total, val_labels_total,val_max_probability_cumulative = val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels)
+            val_loss, val_acc, val_time,val_class_total, val_labels_total,val_max_probability_cumulative, conf_mat_placeholder = val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels,val_e)
 
             #Calculates the percentage of models correct predictions for each class, arranged in a 1D array with 10 elements. From one validation epoch
             vcacc = numpy.round((val_class_total/val_labels_total)*100,2)
@@ -472,6 +486,8 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
             with open("Test_2_LR0-001/epoch_summary_T2.csv","a") as f:
                 f.write(f"\n{(e-1)+(val_e/5)},{round(loss_avg_epoch/(n+1),4)},{val_loss},{round(correct_total/(n+1)*100,2)}%,{val_acc}%,{train_max_probability_cumulative},{val_max_probability_cumulative},{round(time_train - start_time)}s,{val_time}s,{lr},{round(gradient_mean/(n+1),4)},{tcacc[0]},{tcacc[1]},{tcacc[2]},{tcacc[3]},{tcacc[4]},{tcacc[5]},{tcacc[6]},{tcacc[7]},{tcacc[8]},{tcacc[9]},{vcacc[0]},{vcacc[1]},{vcacc[2]},{vcacc[3]},{vcacc[4]},{vcacc[5]},{vcacc[6]},{vcacc[7]},{vcacc[8]},{vcacc[9]}")
 
+    #val_e = 5, only for confusion matrix use.
+    val_e += 1
 
     #Gets the total cumulative correct predictions by model
     class_total = class_accuracy(class_total,probability_total,one_hot_total,n)
@@ -489,24 +505,24 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
     end_time = time.time()
 
     #Stores the most recent iteration's parameters into a npz file
-    #numpy.savez(f"Test_2_LR0-001/epoch_{e}_parameters_T2.npz",wki = weight_ki, bk = bias_k, wjk = weight_jk, bj = bias_j)
+    numpy.savez(f"Test_2_LR0-001/epoch_{e}_parameters_T2.npz",wki = weight_ki, bk = bias_k, wjk = weight_jk, bj = bias_j)
 
     #calculates the statistics for 1 epoch
     loss_avg_epoch,correct_total,time_epoch,gradient_mean = epoch_log_calc(n,loss_avg_epoch,correct_total,end_time,start_time,gradient_mean)
 
-    return loss_avg_epoch, correct_total,time_epoch,gradient_mean,bias_j, bias_k, weight_jk, weight_ki,class_total,labels_total,tcacc,max_probability_epoch
+    return loss_avg_epoch, correct_total,time_epoch,gradient_mean,bias_j, bias_k, weight_jk, weight_ki,class_total,labels_total,tcacc,max_probability_epoch,val_e,confusion_matrix_train
 
-def val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels):
+def val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels,val_e):
     
-    correct = 0
-    correct_total = 0
-    loss_avg_epoch = 0
-    val_max_probability_epoch = 0
+    correct,correct_total,loss_avg_epoch,val_max_probability_epoch,val_loss = 0,0,0,0,0
+
     probability_total = numpy.zeros((len(val_dataset),10))
     one_hot_total = numpy.zeros((len(val_dataset),10))
     class_total = numpy.zeros(10)
     labels_total = numpy.zeros(10)
-    
+    #Initialize Confusion Matrix for the validation dataset. Rows = True, Columns = Predicted
+    confusion_matrix_val = numpy.zeros((10,10))
+
     #logs start time of 1 epoch
     start_time = time.time()
 
@@ -543,6 +559,10 @@ def val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels):
         #Counts how many times the algorithm predicted correctly
         correct,correct_total = accuracy_num(correct,correct_total,one_hot,probability)
 
+        if val_e == 5:
+            #Updates matrix every sample, only for the fifth validation epoch
+            confusion_matrix_val = confusion_matrix(confusion_matrix_val,one_hot,probability)
+
     #logging end time for 1 epoch
     end_time = time.time()
 
@@ -562,7 +582,7 @@ def val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels):
     #Calculating percentage of models correct predictions
     val_max_probability_epoch = round((val_max_probability_epoch/len(val_dataset))*100,2)
 
-    return val_loss, val_acc, val_time, val_class_total, val_labels_total,val_max_probability_epoch
+    return val_loss, val_acc, val_time, val_class_total, val_labels_total,val_max_probability_epoch,confusion_matrix_val
 
 #reshapes the 3D arraay into a 2D array by compressing the 28x28 matrix inside into a 1D 784 element array
 new_train_images = reshape(train_images)
@@ -571,32 +591,35 @@ new_train_images = reshape(train_images)
 train_images_normalized = normalize(new_train_images)
 
 #Splits the training data into training and validation data. Just number of rows has changed, each row still contains 784 elements
-train_dataset = train_images_normalized[:5000,:]
-val_dataset = train_images_normalized[5000:6000,:]
-train_labels = train_labels_total[:5000]
-val_labels = train_labels_total[5000:6000]
+train_dataset = train_images_normalized[:50000,:]
+val_dataset = train_images_normalized[50000:60000,:]
+train_labels = train_labels_total[:50000]
+val_labels = train_labels_total[50000:60000]
 
+# for e in range(1):
+
+
+e = 5
 #Sets number of iterations per batch
 batch_num = 250
-#epoch number
-e = 1
+
 #Learning Rate
 lr = 0.001
 
 #Loads the stored parameters
-#data = numpy.load(f"epoch_{e-1}_parameters.npz")
-data = numpy.load(f"initial_parameters5.npz")
+data = numpy.load(f"Test_2_LR0-001/epoch_{e-1}_parameters_T2.npz")
+#data = numpy.load(f"initial_parameters_original.npz")
 weight_ki = data["wki"]
 bias_k = data["bk"]
 weight_jk = data["wjk"]
 bias_j = data["bj"]
 
 #Function to run 1 epoch for training
-train_loss,train_acc,train_time,gradient_mean,bias_j, bias_k, weight_jk, weight_ki, class_total, labels_total, tcacc, train_max_prob_avg = train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,val_dataset,train_labels,val_labels,lr)
+train_loss,train_acc,train_time,gradient_mean,bias_j, bias_k, weight_jk, weight_ki, class_total, labels_total, tcacc, train_max_prob_avg,val_e,confusion_matrix_train = train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,val_dataset,train_labels,val_labels,lr)
 
 
 #Function to run 1 epoch for validation
-val_loss, val_acc, val_time, val_class_total, val_labels_total, val_max_prob_avg = val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels)
+val_loss, val_acc, val_time, val_class_total, val_labels_total, val_max_prob_avg,confusion_matrix_val = val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels,val_e)
 
 #Calculates the percentage of models correct predictions for each class, arranged in a 1D array with 10 elements. From one validation epoch
 vcacc = numpy.round((val_class_total/val_labels_total)*100,2)
@@ -605,3 +628,5 @@ vcacc = numpy.round((val_class_total/val_labels_total)*100,2)
 with open("Test_2_LR0-001/epoch_summary_T2.csv","a") as f:
     f.write(f"\n{e:.1f},{train_loss},{val_loss},{train_acc}%,{val_acc}%,{train_max_prob_avg},{val_max_prob_avg},{train_time}s,{val_time}s,{lr},{gradient_mean},{tcacc[0]},{tcacc[1]},{tcacc[2]},{tcacc[3]},{tcacc[4]},{tcacc[5]},{tcacc[6]},{tcacc[7]},{tcacc[8]},{tcacc[9]},{vcacc[0]},{vcacc[1]},{vcacc[2]},{vcacc[3]},{vcacc[4]},{vcacc[5]},{vcacc[6]},{vcacc[7]},{vcacc[8]},{vcacc[9]}")
 
+#Saves the 2 confusion matrix from training and validation dataset into a single npz file
+numpy.savez(f"Test_2_LR0-001/Confusion_Matrix_E{e}.npz",train = confusion_matrix_train, val = confusion_matrix_val)
