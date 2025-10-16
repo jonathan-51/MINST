@@ -362,6 +362,41 @@ def confusion_matrix(matrix,one_hot,probability):
     matrix[i_t,i_p] += 1
     return matrix
 
+def incorrect_correct_bin(probability_total,bin_index,one_hot_total,accuracy_bin,n):    
+    i = numpy.where(probability_total[n] == numpy.max(probability_total[n]))
+    if one_hot_total[n,i[0][0]] == 1:
+        accuracy_bin[bin_index] += 1
+    return accuracy_bin
+
+def calibration_curve(probability_total,one_hot_total):
+
+    #Initilizes 1D array to store max predicted probability of each sample
+    predicted_probability = 0
+    #Initializing a 1D array to store the average predicted probability of each bin
+    avg_pp_bin = numpy.zeros(10)
+    #Initializing a 1D array to store total amount of entries for predicted probability within a bin
+    total_pp_bin = numpy.zeros(10)
+    total_pp_bin[0] = 1
+    #Initializing a 1D array to store the number of actual correct predictions made by model for each bin
+    accuracy_bin = numpy.zeros(10)
+    
+    for n in range(len(probability_total)):
+
+        #Taking the max predicted probability made by the model from each sample and storing that in another array with its corresponding index
+        predicted_probability = numpy.max(probability_total[n])
+        bin_index = numpy.int64(numpy.floor(predicted_probability*10))
+        if bin_index == 10:
+            bin_index = 9
+        avg_pp_bin[bin_index] += predicted_probability
+        total_pp_bin[bin_index] += 1
+
+        accuracy_bin = incorrect_correct_bin(probability_total,bin_index,one_hot_total,accuracy_bin,n)
+
+    avg_pp_bin = numpy.round((avg_pp_bin/total_pp_bin)*100,2)
+    accuracy_bin = numpy.round((accuracy_bin/total_pp_bin)*100,2)
+
+    return avg_pp_bin,accuracy_bin
+
 def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,val_dataset,train_labels,val_labels,lr):
 
     max_probability_epoch, val_e, count,batch,correct,correct_total,probability_avg_batch,loss_avg_batch,loss_avg_epoch,gradient_mean,dw_FL_batch,dw_FL_1_batch,db_FL_batch,db_FL_1_batch = 0,0,0,0,0,0,0,0,0,0,0,0,0,0
@@ -380,7 +415,7 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
         if count == 0:
             #logs start time for 1 batch
             batch_start = time.time()
-        
+
         #Generates a binary array (1 = correct, 0 = incorrect) where the index of the array represents the digit
         one_hot = one_hot_encoding(train_labels,n)
         #stores 'nth' one hot in an array
@@ -409,10 +444,10 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
 
         #Counts how many times the algorithm predicted correctly
         correct,correct_total = accuracy_num(correct,correct_total,one_hot,probability)
-
+        
         #Calculates all derivatives for all weights and biases in the network for each input sample, and stores it in an array.
         dweight_FL, dbias_FL, dbias_FL_1, dweight_FL_1, dC_dzL = backprop(probability,weight_jk,train_dataset,FHL,n,one_hot)
-
+        
         #calculates the average magnitude of the gradient for the whole network
         gradient_mean += numpy.sqrt((numpy.sum(dweight_FL**2)) + (numpy.sum(dbias_FL**2)) + (numpy.sum(dweight_FL_1**2)) + (numpy.sum(dbias_FL_1**2)))
 
@@ -454,7 +489,7 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
             batch_end = time.time()
             
             #recording a batch's statistics into a csv file
-            with open("Test_2_LR0-001/training_report_T2.csv","a") as f:
+            with open("Test_1_LR0-01/training_report_T1.csv","a") as f:
                 f.write(f"\n{e},{batch},{lr},{loss_avg_batch},{probability_avg_batch}%,{accuracy_batch}%,{round((batch_end - batch_start),3)}s,{dweight_ki_norm},{dbias_k_norm},{dweight_jk_norm},{dbias_j_norm}")
             
             #Reintialize the variables to prep for next batch
@@ -477,15 +512,14 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
             train_max_probability_cumulative = round((max_probability_epoch/(n+1))*100,2)
 
             #Function to run 1 epoch for validation
-            val_loss, val_acc, val_time,val_class_total, val_labels_total,val_max_probability_cumulative, conf_mat_placeholder = val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels,val_e)
+            val_loss, val_acc, val_time,val_class_total, val_labels_total,val_max_probability_cumulative, conf_mat_placeholder,pp_bin_placeholder,acc_bin_placeholder = val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels,val_e)
 
             #Calculates the percentage of models correct predictions for each class, arranged in a 1D array with 10 elements. From one validation epoch
             vcacc = numpy.round((val_class_total/val_labels_total)*100,2)
 
             time_train = time.time()
-            with open("Test_2_LR0-001/epoch_summary_T2.csv","a") as f:
+            with open("Test_1_LR0-01/epoch_summary_T1.csv","a") as f:
                 f.write(f"\n{(e-1)+(val_e/5)},{round(loss_avg_epoch/(n+1),4)},{val_loss},{round(correct_total/(n+1)*100,2)}%,{val_acc}%,{train_max_probability_cumulative},{val_max_probability_cumulative},{round(time_train - start_time)}s,{val_time}s,{lr},{round(gradient_mean/(n+1),4)},{tcacc[0]},{tcacc[1]},{tcacc[2]},{tcacc[3]},{tcacc[4]},{tcacc[5]},{tcacc[6]},{tcacc[7]},{tcacc[8]},{tcacc[9]},{vcacc[0]},{vcacc[1]},{vcacc[2]},{vcacc[3]},{vcacc[4]},{vcacc[5]},{vcacc[6]},{vcacc[7]},{vcacc[8]},{vcacc[9]}")
-
     #val_e = 5, only for confusion matrix use.
     val_e += 1
 
@@ -501,20 +535,22 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
     #calculates the average highest predicted probability
     max_probability_epoch = round((max_probability_epoch/len(train_dataset))*100,2)
 
+    T_avg_pp_bin,T_acc_bin = calibration_curve(probability_total,one_hot_total)
+
     #logging end time for 1 epoch
     end_time = time.time()
 
     #Stores the most recent iteration's parameters into a npz file
-    numpy.savez(f"Test_2_LR0-001/epoch_{e}_parameters_T2.npz",wki = weight_ki, bk = bias_k, wjk = weight_jk, bj = bias_j)
+    numpy.savez(f"Test_1_LR0-01/epoch_{e}_parameters_T1.npz",wki = weight_ki, bk = bias_k, wjk = weight_jk, bj = bias_j)
 
     #calculates the statistics for 1 epoch
     loss_avg_epoch,correct_total,time_epoch,gradient_mean = epoch_log_calc(n,loss_avg_epoch,correct_total,end_time,start_time,gradient_mean)
 
-    return loss_avg_epoch, correct_total,time_epoch,gradient_mean,bias_j, bias_k, weight_jk, weight_ki,class_total,labels_total,tcacc,max_probability_epoch,val_e,confusion_matrix_train
+    return loss_avg_epoch, correct_total,time_epoch,gradient_mean,bias_j, bias_k, weight_jk, weight_ki,class_total,labels_total,tcacc,max_probability_epoch,val_e,confusion_matrix_train, T_avg_pp_bin,T_acc_bin
 
 def val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels,val_e):
     
-    correct,correct_total,loss_avg_epoch,val_max_probability_epoch,val_loss = 0,0,0,0,0
+    V_avg_pp_bin,V_acc_bin,correct,correct_total,loss_avg_epoch,val_max_probability_epoch,val_loss = 0,0,0,0,0,0,0
 
     probability_total = numpy.zeros((len(val_dataset),10))
     one_hot_total = numpy.zeros((len(val_dataset),10))
@@ -582,7 +618,10 @@ def val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels,val_e)
     #Calculating percentage of models correct predictions
     val_max_probability_epoch = round((val_max_probability_epoch/len(val_dataset))*100,2)
 
-    return val_loss, val_acc, val_time, val_class_total, val_labels_total,val_max_probability_epoch,confusion_matrix_val
+    if val_e == 5:
+        V_avg_pp_bin,V_acc_bin = calibration_curve(probability_total,one_hot_total)
+
+    return val_loss, val_acc, val_time, val_class_total, val_labels_total,val_max_probability_epoch,confusion_matrix_val,V_avg_pp_bin,V_acc_bin
 
 #reshapes the 3D arraay into a 2D array by compressing the 28x28 matrix inside into a 1D 784 element array
 new_train_images = reshape(train_images)
@@ -596,37 +635,41 @@ val_dataset = train_images_normalized[50000:60000,:]
 train_labels = train_labels_total[:50000]
 val_labels = train_labels_total[50000:60000]
 
-# for e in range(1):
+for e in range(11,16):
+
+    #Sets number of iterations per batch
+    batch_num = 1000
+
+    #Learning Rate
+    lr = 0.01
+
+    #Loads the stored parameters
+    data = numpy.load(f"Test_1_LR0-01/epoch_{e-1}_parameters_T1.npz")
+    #data = numpy.load(f"initial_parameters.npz")
+    weight_ki = data["wki"]
+    bias_k = data["bk"]
+    weight_jk = data["wjk"]
+    bias_j = data["bj"]
+
+    #Function to run 1 epoch for training
+    train_loss,train_acc,train_time,gradient_mean,bias_j, bias_k, weight_jk, weight_ki, class_total, labels_total, tcacc, train_max_prob_avg,val_e,confusion_matrix_train,T_avg_pp_bin,T_acc_bin = train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,val_dataset,train_labels,val_labels,lr)
 
 
-e = 5
-#Sets number of iterations per batch
-batch_num = 250
+    #Function to run 1 epoch for validation
+    val_loss, val_acc, val_time, val_class_total, val_labels_total, val_max_prob_avg,confusion_matrix_val,V_avg_pp_bin,V_acc_bin = val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels,val_e)
 
-#Learning Rate
-lr = 0.001
+    #Calculates the percentage of models correct predictions for each class, arranged in a 1D array with 10 elements. From one validation epoch
+    vcacc = numpy.round((val_class_total/val_labels_total)*100,2)
 
-#Loads the stored parameters
-data = numpy.load(f"Test_2_LR0-001/epoch_{e-1}_parameters_T2.npz")
-#data = numpy.load(f"initial_parameters_original.npz")
-weight_ki = data["wki"]
-bias_k = data["bk"]
-weight_jk = data["wjk"]
-bias_j = data["bj"]
+    #Record statistics onto a csv file after each epoch
+    with open("Test_1_LR0-01/epoch_summary_T1.csv","a") as f:
+        f.write(f"\n{e:.1f},{train_loss},{val_loss},{train_acc}%,{val_acc}%,{train_max_prob_avg},{val_max_prob_avg},{train_time}s,{val_time}s,{lr},{gradient_mean},{tcacc[0]},{tcacc[1]},{tcacc[2]},{tcacc[3]},{tcacc[4]},{tcacc[5]},{tcacc[6]},{tcacc[7]},{tcacc[8]},{tcacc[9]},{vcacc[0]},{vcacc[1]},{vcacc[2]},{vcacc[3]},{vcacc[4]},{vcacc[5]},{vcacc[6]},{vcacc[7]},{vcacc[8]},{vcacc[9]}")
 
-#Function to run 1 epoch for training
-train_loss,train_acc,train_time,gradient_mean,bias_j, bias_k, weight_jk, weight_ki, class_total, labels_total, tcacc, train_max_prob_avg,val_e,confusion_matrix_train = train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,val_dataset,train_labels,val_labels,lr)
+    with open("Test_1_LR0-01/CC_T_T1.csv", "a") as f:
+            f.write(f"\n{e},{T_avg_pp_bin[0]},{T_avg_pp_bin[1]},{T_avg_pp_bin[2]},{T_avg_pp_bin[3]},{T_avg_pp_bin[4]},{T_avg_pp_bin[5]},{T_avg_pp_bin[6]},{T_avg_pp_bin[7]},{T_avg_pp_bin[8]},{T_avg_pp_bin[9]},{T_acc_bin[0]},{T_acc_bin[1]},{T_acc_bin[2]},{T_acc_bin[3]},{T_acc_bin[4]},{T_acc_bin[5]},{T_acc_bin[6]},{T_acc_bin[7]},{T_acc_bin[8]},{T_acc_bin[9]}")
 
+    with open("Test_1_LR0-01/CC_V_T1.csv", "a") as f:
+            f.write(f"\n{e},{V_avg_pp_bin[0]},{V_avg_pp_bin[1]},{V_avg_pp_bin[2]},{V_avg_pp_bin[3]},{V_avg_pp_bin[4]},{V_avg_pp_bin[5]},{V_avg_pp_bin[6]},{V_avg_pp_bin[7]},{V_avg_pp_bin[8]},{V_avg_pp_bin[9]},{V_acc_bin[0]},{V_acc_bin[1]},{V_acc_bin[2]},{V_acc_bin[3]},{V_acc_bin[4]},{V_acc_bin[5]},{V_acc_bin[6]},{V_acc_bin[7]},{V_acc_bin[8]},{V_acc_bin[9]}")
 
-#Function to run 1 epoch for validation
-val_loss, val_acc, val_time, val_class_total, val_labels_total, val_max_prob_avg,confusion_matrix_val = val_epoch(bias_j, bias_k, weight_jk, weight_ki,val_dataset,val_labels,val_e)
-
-#Calculates the percentage of models correct predictions for each class, arranged in a 1D array with 10 elements. From one validation epoch
-vcacc = numpy.round((val_class_total/val_labels_total)*100,2)
-
-#Record statistics onto a csv file after each epoch
-with open("Test_2_LR0-001/epoch_summary_T2.csv","a") as f:
-    f.write(f"\n{e:.1f},{train_loss},{val_loss},{train_acc}%,{val_acc}%,{train_max_prob_avg},{val_max_prob_avg},{train_time}s,{val_time}s,{lr},{gradient_mean},{tcacc[0]},{tcacc[1]},{tcacc[2]},{tcacc[3]},{tcacc[4]},{tcacc[5]},{tcacc[6]},{tcacc[7]},{tcacc[8]},{tcacc[9]},{vcacc[0]},{vcacc[1]},{vcacc[2]},{vcacc[3]},{vcacc[4]},{vcacc[5]},{vcacc[6]},{vcacc[7]},{vcacc[8]},{vcacc[9]}")
-
-#Saves the 2 confusion matrix from training and validation dataset into a single npz file
-numpy.savez(f"Test_2_LR0-001/Confusion_Matrix_E{e}.npz",train = confusion_matrix_train, val = confusion_matrix_val)
+    #Saves the 2 confusion matrix from training and validation dataset into a single npz file
+    numpy.savez(f"Test_1_LR0-01/CM_E{e}_T1.npz",train = confusion_matrix_train, val = confusion_matrix_val)
