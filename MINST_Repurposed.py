@@ -17,48 +17,65 @@ class Model:
         self.labels = labels
         pass
 
-    def train(self,train_images,train_labels,LR):
+    def train(self,images,labels,LR):
         """Runs one full training epoch with a sample size of 50000 units.
         Initialisation --> Front Propagation --> Back Propagation
         Updates Parameters after each iteration"""
 
         # Getting training dataset (First 50000 samples from main dataset)
-        train_images, train_labels = self.getTrainingDataset(train_images,train_labels)
+        train_images, train_labels = self.getTrainingDataset(images,labels)
 
-        Aj_Epoch = numpy.zeros((50,10))
-        OHE_Epoch = numpy.zeros((50,10))
+        Aj_Epoch = numpy.zeros((len(train_images),10))
+        OHE_Epoch = numpy.zeros((len(train_images),10))
+        norm_grad = 0
+        start_time = time.time()  # Logs start time for 1 training epoch
+
+        parameters = self.getTrainingParameters()  # Loading pretrained Parameters from File
 
         # Loops front and back propagation
-        for sample in range(50):
-            train_images_sample = train_images[sample].reshape(784,1)                                   # Reshape from (784,) to (784,1)
-            parameters = self.getParameters()                                                           # Loading Parameters from File
-            OHE,OHE_Epoch = self.getOneHotEncoding(train_labels,sample,OHE_Epoch)                       # Getting One Hot Encoding (10,1)
-            Zk,Ak,Aj,loss,Aj_Epoch = self.Forward(train_images_sample,parameters,OHE,sample,Aj_Epoch)   # One Forward Pass
-            updated_parameters = self.Backward(Aj,Ak,OHE,parameters,Zk,train_images_sample,LR)          # One Backward Pass
+        for sample in range(len(train_images)):
+            train_images_sample = train_images[sample].reshape(784,1)                                       # Reshape from (784,) to (784,1)
+            
+            OHE,OHE_Epoch = self.getOneHotEncoding(train_labels,sample,OHE_Epoch)                           # Getting One Hot Encoding (10,1)
+            
+            Zk,Ak,Aj,loss,Aj_Epoch = self.Forward(train_images_sample,parameters,OHE,sample,Aj_Epoch)       # One Forward Pass
+            
+            parameters,norm_grad = self.Backward(Aj,Ak,OHE,parameters,Zk,train_images_sample,LR,norm_grad)  # One Backward Pass
+        
+        end_time = time.time()  # Logs end time for 1 training epoch
 
-        return loss,Aj_Epoch,OHE_Epoch
+        self.getTrainingData(loss,Aj_Epoch,OHE_Epoch,(end_time-start_time),norm_grad/len(train_images))
+        return parameters
     
-    def val(self,val_images,vak_labels):
+    def val(self,images,labels,updated_parameters):
         """Runs one full validation epoch with a sampel size of 10000 units.
         Initialisation --> Front Propagation. No back propagation. 
         Tests the generalisation of the model."""
 
         # Getting Validation dataset (Last 10000 Units from main dataset)
-        val_images, vak_labels = self.getValidationDataset(val_images,vak_labels)
+        val_images, val_labels = self.getValidationDataset(images,labels)
 
-        Aj_Epoch = numpy.zeros((50,10))
-        OHE_Epoch = numpy.zeros((50,10))
+        Aj_Epoch = numpy.zeros((len(val_images),10))
+        OHE_Epoch = numpy.zeros((len(val_images),10))
+
+        start_time = time.time()  # Logs start time for 1 validation epoch
 
         #Loops front propagation
-        for sample in range(50):
+        for sample in range(len(val_images)):
 
+            
             val_images_sample = val_images[sample].reshape(784,1)                                   # Reshape from (784,) to (784,1)
-            parameters = self.getParameters()                                                       # Loading Parameters from File
-            OHE,OHE_Epoch = self.getOneHotEncoding(vak_labels,sample,OHE_Epoch)                     #Getting One Hot Encoding (10,1)
-            _,_,_, loss,Aj_Epoch = self.Forward(val_images_sample,parameters,OHE,sample,Aj_Epoch)   # One Forward Pass
+            
+            #parameters = self.getValidationParameters()                                             # Loading Parameters from File
+            
+            OHE,OHE_Epoch = self.getOneHotEncoding(val_labels,sample,OHE_Epoch)                     #Getting One Hot Encoding (10,1)
+            
+            _,_,_, loss,Aj_Epoch = self.Forward(val_images_sample,updated_parameters,OHE,sample,Aj_Epoch)   # One Forward Pass
 
+        end_time = time.time()  # Logs end time for 1 validation epoch
 
-        return loss,Aj_Epoch,OHE_Epoch
+        self.getValidationData(loss,Aj_Epoch,OHE_Epoch,(end_time-start_time))
+        return
 
 #======================================================================================================
 # 1. INITIALISATION
@@ -99,10 +116,27 @@ class Model:
 
         return val_images,val_labels
     
-    def getParameters(self):
+    def getTrainingParameters(self):
         """Loads pre-trained model weights and biases from file."""
        
-        parameters = numpy.load("Repurposed/test_parameters.npz")
+        parameters = numpy.load("Repurposed/test_parameters5.npz")
+
+        parameters_dict = {"Weight_k_i":parameters['wki'], # weights: input -> hidden
+                           "Bias_k":parameters['bk'],      # biases:  hidden
+                           "Weight_j_k":parameters['wjk'], # weights: hidden -> output
+                           "Bias_j":parameters['bj']}      # weights: output
+        
+        print(parameters_dict["Weight_k_i"].shape)
+        print((parameters_dict["Bias_k"]).shape)
+        print(parameters_dict["Weight_j_k"].shape)
+        print((parameters_dict["Bias_j"]).shape)
+        print("-------------------")
+        return parameters_dict
+    
+    #def getValidationParameters(self):
+        """Loads pre-trained model weights and biases from file."""
+       
+        parameters = numpy.load("Repurposed/test_parameters5.npz")
 
         parameters_dict = {"Weight_k_i":parameters['wki'], # weights: input -> hidden
                            "Bias_k":parameters['bk'],      # biases:  hidden
@@ -204,7 +238,7 @@ class Model:
         """
 
         # Matrix Multiplication to calculate weighted sum (10,64)@(64,1)
-        # Matrix addition to calculate preactivation neuron (64,1)+(64,1)
+        # Matrix addition to calculate preactivation neuron (10,1)+(10,1)
         Zj = parameters["Weight_j_k"]@Ak
         Zj = Zj + parameters["Bias_j"]
 
@@ -235,13 +269,13 @@ class Model:
 # 3. BACKWARD PROPAGATION
 #======================================================================================================    
 
-    def Backward(self,Aj,Ak,OHE,parameters,Zk,train_images_sample,LR):
+    def Backward(self,Aj,Ak,OHE,parameters,Zk,train_images_sample,LR,norm_grad):
         """Runs a Backward Pass for one sample"""
 
-        gradients = self.getGradients(Aj,Ak,OHE,parameters,Zk,train_images_sample)  #Computes gradient values for all parameters
+        gradients,norm_grad = self.getGradients(Aj,Ak,OHE,parameters,Zk,train_images_sample,norm_grad)  #Computes gradient values for all parameters
         updated_parameters = self.ParametersUpdate(parameters,gradients,LR)         #Returns updated parameters
 
-        return updated_parameters
+        return updated_parameters,norm_grad
     
     def dReLU(self,Zk):
         """Returns the derivatives of all Ak values w.r.t their respective Zk values"""
@@ -251,26 +285,27 @@ class Model:
 
         return Zk
     
-    def getGradients(self,Aj,Ak,OHE,parameters,Zk,train_images_sample):
+    def getGradients(self,Aj,Ak,OHE,parameters,Zk,train_images_sample,norm_grad):
         """Calculates gradients for all parameters.
         Returns a dictionary of all 4 types of parameters, where each gradient value
         represents the value of the same index"""
         
         dZ_j = Aj - OHE                                             #Preactivation Neurons in Output Layer
         dZ_k = ((parameters["Weight_j_k"].T)@dZ_j)*self.dReLU(Zk)   #Preactivation Neurons in Hidden Layer
-
-        db_j = dZ_j                                                 #Biases in Output Layer
+        db_j = dZ_j
         dW_jk = dZ_j@Ak.T                                           #Weights in Hidden Layer
 
         db_k = dZ_k                                                 #Biases in Hidden Layer
         dw_ki = dZ_k@train_images_sample.T                          #Weights in Input Layer
-
+        
         gradients = {"Weight_k_i":dw_ki,
                      "Bias_k":db_k,
                      "Weight_j_k":dW_jk,
                      "Bias_j":db_j}
-        
-        return gradients
+ 
+
+        norm_grad += numpy.sqrt((numpy.sum(dW_jk**2)) + (numpy.sum(db_j**2)) + (numpy.sum(dw_ki**2)) + (numpy.sum(db_k**2)))
+        return gradients,norm_grad
 
     def ParametersUpdate(self,parameters,gradients,LR):
         """Updating parameters by taking the difference between its value and 
@@ -291,32 +326,51 @@ class Model:
         return updated_parameters
 
 #======================================================================================================
-# 4. Evaluation
+# 3.5 PREPARING EVALUATION
 #======================================================================================================    
 
-    def getData(self,train_loss,val_loss,train_Aj_Epoch,val_Aj_Epoch,train_OHE_Epoch,val_OHE_Epoch):
-        self.TL = train_loss
-        self.VL = val_loss
-        self.train_Aj_Epoch = train_Aj_Epoch
-        self.val_Aj_Epoch = val_Aj_Epoch
-        self.train_OHE_Epoch = train_OHE_Epoch
-        self.val_OHE_Epoch = val_OHE_Epoch
+    def getTrainingData(self,train_loss,train_Aj_Epoch,train_OHE_Epoch,train_time,norm_grad_mean):
+        self.trainloss = train_loss
+        self.train_predicted_probability = train_Aj_Epoch
+        self.train_true_label = train_OHE_Epoch
+        self.traintime = train_time
+        self.normgrad = norm_grad_mean
 
         return
+    
+    def getValidationData(self,val_loss,val_Aj_Epoch,val_OHE_Epoch,val_time):
+        self.valloss = val_loss
+        self.val_predicted_probability = val_Aj_Epoch
+        self.val_true_label = val_OHE_Epoch
+        self.valtime = val_time
+
+        return
+
+#======================================================================================================
+# 4. EVALUATION
+#======================================================================================================    
 class Evaluation:
     def __init__(self,model):
         self.model = model
 
         pass
     
-    def Logging(self,train_loss,val_loss):
+    def getEpochStats(self):
+        """Aggregate all data required to log for epoch summary."""
 
-        with open("Test_3_LR0-005/epoch_summary_T3.csv","a") as f:
-            f.write(f"\n{e:.1f},{train_loss:.4f},{val_loss:.4f},{train_acc}%,{val_acc}%,{train_max_prob_avg},{val_max_prob_avg},{train_time}s,{val_time}s,{lr},{gradient_mean},{tcacc[0]},{tcacc[1]},{tcacc[2]},{tcacc[3]},{tcacc[4]},{tcacc[5]},{tcacc[6]},{tcacc[7]},{tcacc[8]},{tcacc[9]},{vcacc[0]},{vcacc[1]},{vcacc[2]},{vcacc[3]},{vcacc[4]},{vcacc[5]},{vcacc[6]},{vcacc[7]},{vcacc[8]},{vcacc[9]}")
+        train_loss = self.model.trainloss       #gets most recent iteration's training loss value
+        val_loss = self.model.valloss           #gets most recent iteration's validation loss value
 
-        return 
+        train_acc,val_acc = self.getAccuracy()  #gets model's correct predictions for both training and validation
+
+        train_time = self.model.traintime       #gets model's training time and validation time for one epoch
+        val_time = self.model.valtime
+
+        norm_grad_mean = self.model.normgrad    #gets normalized gradient for one epoch (Average magnitude of all parameters gradient from one iteration)
+
+        return train_loss,val_loss,train_acc,val_acc,train_time,val_time,norm_grad_mean
      
-    def Accuracy(self):
+    def getAccuracy(self):
         """Handles calculating the accuracy of model for 1 epoch from both Training and Validation.
         Model's highest predicted probability for an iteration is considered the model's prediction.
         Compares model's highest predicted probability with true labels of its corresponding index.
@@ -324,51 +378,121 @@ class Evaluation:
         computes the accuracy."""
 
 
-        train_predictions_total = self.model.train_Aj_Epoch     # Getting model's training predictions for all classes from each iteration
-        val_predictions_total = self.model.val_Aj_Epoch         # Getting model's validation predictions for all classes from each iteration
-        train_true_labels_total = self.model.train_OHE_Epoch    # Getting True labels for training dataset
-        val_true_labels_total = self.model.val_OHE_Epoch        # Getting True labels for validation dataset
+        train_predictions_total = self.model.train_predicted_probability    # Getting model's training predictions for all classes from each iteration
+        val_predictions_total = self.model.val_predicted_probability        # Getting model's validation predictions for all classes from each iteration
+        train_true_labels_total = self.model.train_true_label               # Getting True labels for training dataset
+        val_true_labels_total = self.model.val_true_label                   # Getting True labels for validation dataset
 
-        train_prediction_indices = numpy.argmax(train_predictions_total,axis=1)                      # Finds the indices of model's prediction for all iterations 
-        train_sample_indices = numpy.arange(len(train_true_labels_total))                            # Gets the indices of length of training dataset
+        train_prediction_indices = numpy.argmax(train_predictions_total,axis=1)                      # Finds the indices of model's prediction for all iterations, 1D
+        train_sample_indices = numpy.arange(len(train_true_labels_total))                            # Gets the indices of length of training dataset, 1D               
         train_correct = sum(train_true_labels_total[train_sample_indices,train_prediction_indices])  # Computes total amount model got correct from 1 training epoch
 
         val_prediction_indices = numpy.argmax(val_predictions_total,axis=1)                          # Finds the indices of models prediction for all iterations
         val_sample_indices = numpy.arange(len(val_true_labels_total))                                # Gets the indices of length of validation dataset
         val_correct = sum(val_true_labels_total[val_sample_indices,val_prediction_indices])          # Computes the total amount model got correct from 1 validation epoch
 
-        train_accuracy = train_correct/len(train_true_labels_total) # Computes accuracy of model from training
-        val_accuracy = val_correct/len(val_true_labels_total)       # Computes accuracy of model from validation
+        train_accuracy = (train_correct/len(train_true_labels_total)) * 100     # Computes accuracy of model from training
+        val_accuracy = (val_correct/len(val_true_labels_total)) * 100           # Computes accuracy of model from validation
         
         return train_accuracy,val_accuracy
     
-    def Time(self):
+    def getCalibration(self):
+        """Returns models average predicted probability in each bin and model's total correct predictions in each bin. 
+        Array of 10 bins, each bin representing a specific predicted probability's range, 
+        e.g bin 1 represents predicted probability between 10%-20%,etc. """
+
+
+        val_predictions_total = self.model.val_predicted_probability        # Getting model's validation predictions for all classes from each iteration
+        val_true_labels_total = self.model.val_true_label                   # Getting True labels for validation dataset
+                     
+        pred_prob_bin = numpy.zeros((1,10))
+        total_bin = numpy.zeros((1,10))
+        correct_bin = numpy.zeros((1,10))
+
+
+        max_pred = numpy.max(val_predictions_total,axis=1)  # Gets all the model's max predictions from each sample, 1D
+        bin_index = numpy.int64(numpy.floor(max_pred*10))   # Gets each predictions bin index. 1D array where bin index represents its corresponding prediction
+
+        max_pred_indices = numpy.argmax(val_predictions_total,axis=1)                   # Computing index for model's prediction for each interation
+        correct_index = numpy.array(numpy.where(val_true_labels_total == 1)[1])         # Computing index for true label
+        correct_bin_indices = bin_index[numpy.where(max_pred_indices == correct_index)] # Computes model's correct predictions in the form of bin number in an array
+
+        #Looping through every bin number
+        for bin in range(10):
+            pred_prob_bin[0,bin] = numpy.sum(numpy.where(bin_index == bin,max_pred,0))  # Storing the summation of model's predicted probability for each bin
+            total_bin[0,bin] = numpy.sum(numpy.where(bin_index == bin,1,0))             # Storing the summation of total number of samples in each bin
+            correct_bin[0,bin] = numpy.sum(correct_bin_indices == bin)                  # Storing the summation of model's correct predictions for each bin
+
+        
+        predicted_accuracy = numpy.divide(pred_prob_bin , total_bin, out=numpy.zeros_like(pred_prob_bin) , where = total_bin != 0)  #Computes the average predicted accuracy for each bin
+        true_accuracy = numpy.divide(correct_bin , total_bin, out=numpy.zeros_like(correct_bin) , where = total_bin != 0)           #Computes the average true accuracy for each bin
+
+        return predicted_accuracy, true_accuracy
+    
+    def getConfusionMatrix(self):
+        """Returns a 10x10 matrix that determines each class' accuracy, aswell as
+        what class the model predicted when an incorrect prediction is made.
+        True Labels represents the row number respective. Digit 0 = Index 0
+        Prediction represents the column number respectively. Digit 0 = Index 0"""
+
+        val_predictions_total = self.model.val_predicted_probability        # Getting model's validation predictions for all classes from each iteration
+        val_true_labels_total = self.model.val_true_label                   # Getting True labels for validation dataset
+
+        conf_matrix = numpy.zeros((10,10))
+
+        i_p = numpy.argmax(val_predictions_total,axis=1)    # Getting index of model's prediction for all iterations in an epoch
+        i_t = numpy.where(val_true_labels_total==1)[1]      # Getting index of correct class for all interations in an epoch
+        numpy.add.at(conf_matrix,(i_t,i_p),1) 
+        return conf_matrix
+
+#======================================================================================================
+# 5. LOGGING
+#======================================================================================================    
+class Logging:
+    def __init__(self,model,evaluation):
+        self.model = model
+        self.evaluation = evaluation
+        pass
+
+    def savingParameters(self,updated_parameters):
+        numpy.savez(f"Repurposed/test_parameters5.npz",wki = updated_parameters['Weight_k_i'], bk = updated_parameters['Bias_k'], wjk = updated_parameters['Weight_j_k'], bj = updated_parameters['Bias_j'])
+
+        return
+
+    def EpochSummary(self,epoch,LR):
+
+        train_loss,val_loss,train_acc,val_acc,train_time,val_time,norm_grad_mean= self.evaluation.getEpochStats()
+
+        with open("epoch_summary.csv","a") as f:
+            f.write(f"\n{epoch},{LR},{train_loss:.4f},{val_loss:.4f},{train_acc:.2f},{val_acc:.2f},{train_time:.0f},{val_time:.0f},{norm_grad_mean:.3f}")
 
         return
     
-    def GradientNorm(self):
+    def CalibrationCurve(self,e):
+        p_acc, t_acc = self.evaluation.getCalibration()
+        with open("Repurposed/CC_V_Re.csv", "a") as f:
+            f.write(f"\n{e}")
 
+            for idx in range(10):
+                f.write(f",{p_acc[0,idx]:.2f}")
+            for idx in range(10):
+                f.write(f",{t_acc[0,idx]:.2f}")        
         return
     
-    def ClassAccuracy(self):
-
+    def ConfusionMatrix(self,e):
+        conf_matrx = self.evaluation.getConfusionMatrix()
+        numpy.savez(f"Repurposed/CM_e{e}.npz",confusion_matrx = conf_matrx)
         return
-    
-    def Calibration(self):
-
-        return
-    
-    def ConfusionMatrix(self):
-
-        return
-
 
 Test = Model(images,labels)
-
-#train_images,train_labels = Test.getTrainingDataset(images,labels)
-train_loss = Test.train(images,labels,LR=0.01)
-val_loss = Test.val(images,labels)
 Results = Evaluation(Test)
-train_accuracy,val_accuracy = Results.Accuracy()
-print(train_accuracy)
-print(val_accuracy)
+Recording = Logging(Test,Results)
+LR = 0.005
+sample_num = 10
+for epoch in range(1,2):
+    updated_parameters = Test.train(images,labels,LR)    
+    Recording.savingParameters(updated_parameters)
+    Test.val(images,labels,updated_parameters)
+    Recording.EpochSummary(epoch,LR)
+    Recording.CalibrationCurve(epoch)
+    Recording.ConfusionMatrix(epoch)
